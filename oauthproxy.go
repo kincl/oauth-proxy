@@ -330,6 +330,8 @@ func (p *OAuthProxy) redeemCode(host, code string) (s *providers.SessionState, e
 	if s.Email == "" {
 		s.Email, err = p.provider.GetEmailAddress(s)
 	}
+
+	s.Projects, err = p.provider.GetUserProjects(s)
 	return
 }
 
@@ -778,6 +780,9 @@ func (p *OAuthProxy) Authenticate(rw http.ResponseWriter, req *http.Request) int
 		rw.Header().Set("X-Auth-Request-User", session.User)
 		if session.Email != "" {
 			rw.Header().Set("X-Auth-Request-Email", session.Email)
+		}
+		if len(session.Projects) != 0 {
+			rw.Header().Set("X-Auth-Request-Projects", fmt.Sprint(strings.Join(session.Projects, ",")))
 		}
 	}
 	if p.PassAccessToken && session.AccessToken != "" {

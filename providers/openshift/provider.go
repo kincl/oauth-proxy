@@ -44,6 +44,9 @@ type OpenShiftProvider struct {
 	defaultRecord authorizer.AttributesRecord
 	reviews       []string
 	paths         recordsByPath
+
+	projects      bool
+	ProjectURL *url.URL
 }
 
 func New() *OpenShiftProvider {
@@ -62,7 +65,7 @@ func (p *OpenShiftProvider) Bind(flags *flag.FlagSet) {
 
 // LoadDefaults accepts configuration and loads defaults from the environment, or returns an error.
 // The provider may partially initialize config for subsequent calls.
-func (p *OpenShiftProvider) LoadDefaults(serviceAccount string, caPaths []string, reviewJSON, resources string) (*providers.ProviderData, error) {
+func (p *OpenShiftProvider) LoadDefaults(serviceAccount string, caPaths []string, reviewJSON, resources string, projects bool) (*providers.ProviderData, error) {
 	if len(resources) > 0 {
 		paths, err := parseResources(resources)
 		if err != nil {
@@ -80,8 +83,15 @@ func (p *OpenShiftProvider) LoadDefaults(serviceAccount string, caPaths []string
 		return nil, err
 	}
 
+	var scope string
+	scope = "user:info user:check-access"
+	if projects == true {
+		scope = scope + " user:list-projects"
+	}
+	p.projects = projects
+
 	defaults := &providers.ProviderData{
-		Scope: "user:info user:check-access",
+		Scope: scope,
 	}
 
 	// all OpenShift service accounts are OAuth clients, use this if we have it
@@ -260,6 +270,12 @@ func (p *OpenShiftProvider) Complete(data *providers.ProviderData, reviewURL *ur
 		}
 	}
 
+	p.ProjectURL = &url.URL{
+		Scheme: data.ValidateURL.Scheme,
+		Host:   data.ValidateURL.Host,
+		Path:   "/apis/project.openshift.io/v1/projects",
+	}
+
 	p.ProviderData = data
 	p.ReviewURL = reviewURL
 
@@ -397,6 +413,37 @@ func (p *OpenShiftProvider) reviewUser(name, accessToken string) error {
 		}
 	}
 	return nil
+}
+
+func (p *OpenShiftProvider) GetUserProjects(s *providers.SessionState) ([]string, error) {
+	req, err := http.NewRequest("GET", p.ProjectURL.String(), nil)
+	if err != nil {
+		return []string{}, fmt.Errorf("failed building request %s", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.AccessToken))
+	json, err := request(p.Client, req)
+	if err != nil {
+		return []string{}, fmt.Errorf("unable to retrieve projects for user from token: %v", err)
+	}
+	projects, err := json.Get("items").Array()
+	if err != nil {
+		return []string{}, fmt.Errorf("no project list for user: %v", err)
+	}
+
+	var projectList []string
+	for _, i := range projects {
+		project, err := i.(map[string]interface{})
+		if !err {
+			return []string{}, fmt.Errorf("invalid project data: %v", err)
+		}
+		metadata, err := project["metadata"].(map[string]interface{})
+		if !err {
+			return []string{}, fmt.Errorf("bad project metadata: %v", err)
+		}
+		projectList = append(projectList, metadata["name"].(string))
+	}
+	log.Printf("project list %s", projectList)
+	return projectList, nil
 }
 
 // Copied up only to set a different client CA

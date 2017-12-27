@@ -45,6 +45,7 @@ type Options struct {
 	OpenShiftCAs            []string `flag:"openshift-ca" cfg:"openshift_ca"`
 	OpenShiftServiceAccount string   `flag:"openshift-service-account" cfg:"openshift_service_account"`
 	OpenShiftDelegateURLs   string   `flag:"openshift-delegate-urls" cfg:"openshift_delegate_urls"`
+	OpenShiftProjects       bool     `flag:"pass-openshift-projects" cfg:"pass_openshift_projects"`
 
 	CookieName       string        `flag:"cookie-name" cfg:"cookie_name" env:"OAUTH2_PROXY_COOKIE_NAME"`
 	CookieSecret     string        `flag:"cookie-secret" cfg:"cookie_secret" env:"OAUTH2_PROXY_COOKIE_SECRET"`
@@ -134,7 +135,7 @@ func (o *Options) Validate(p providers.Provider) error {
 	// allow the provider to default some values
 	switch provider := p.(type) {
 	case *openshift.OpenShiftProvider:
-		defaults, err := provider.LoadDefaults(o.OpenShiftServiceAccount, o.OpenShiftCAs, o.OpenShiftSAR, o.OpenShiftDelegateURLs)
+		defaults, err := provider.LoadDefaults(o.OpenShiftServiceAccount, o.OpenShiftCAs, o.OpenShiftSAR, o.OpenShiftDelegateURLs, o.OpenShiftProjects)
 		if err != nil {
 			return err
 		}

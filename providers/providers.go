@@ -11,6 +11,7 @@ type Provider interface {
 	Data() *ProviderData
 
 	GetEmailAddress(*SessionState) (string, error)
+	GetUserProjects(*SessionState) ([]string, error)
 	Redeem(string, string) (*SessionState, error)
 	ValidateGroup(string) bool
 	ValidateSessionState(*SessionState) bool
